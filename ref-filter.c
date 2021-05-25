@@ -1395,7 +1395,7 @@ static void grab_contents(struct atom_value *val, int deref, void *buf,
 				v->s_size = buf_size;
 				v->s = xmemdupz(buf, buf_size);
 			} else if (atom->u.contents.option == C_LENGTH)
-				v->s = xstrfmt("%"PRIuMAX, buf_size);
+				v->s = xstrfmt("%"PRIuMAX, (uintmax_t)buf_size);
 			break;
 		}
 		default:
