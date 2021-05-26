@@ -235,11 +235,12 @@ and `date` to extract the named component.  For email fields (`authoremail`,
 without angle brackets, and `:localpart` to get the part before the `@` symbol
 out of the trimmed email.
 
-The message in a commit or a tag object is `contents`, from which
-`contents:<part>` can be used to extract various parts out of:
+The data in a object is `contents`, from which `contents:<part>` can be used
+to extract various parts out of:
 
 contents:size::
-	The size in bytes of the commit or tag message.
+	The size in bytes of the commit or tag message, and the raw object size
+	of the blob or tree.
 
 contents:subject::
 	The first paragraph of the message, which typically is a
@@ -257,7 +258,17 @@ contents:signature::
 	The optional GPG signature of the tag.
 
 contents:lines=N::
-	The first `N` lines of the message.
+	The first `N` lines of the message of the commit or tag message.
+
+contents:raw::
+	The raw data of the object. For blob and tree, it priont all object data,
+	its output is equivalent to `%(contents)`; For commit and tag, it not only
+	print objects’ messages (as `%(contents)` does), but also print objects
+	headers, like the "tree XXX", "parent YYY", etc lines in commits, and the
+	"object OOO", "type TTT", etc lines in tags.
+
+Note: blob and tree objects only support `%(contents)`, `%(contents:raw)` and
+`%(contents:size)`.
 
 Additionally, the trailers as interpreted by linkgit:git-interpret-trailers[1]
 are obtained as `trailers[:options]` (or by using the historical alias

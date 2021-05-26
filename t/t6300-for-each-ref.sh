@@ -63,8 +63,10 @@ test_atom() {
 		tag)
 			# We cannot use $3 as it expects sanitize_pgp to run
 			expect=$(git cat-file tag $ref | tail -n +6 | wc -c) ;;
-		tree | blob)
-			expect='' ;;
+		tree)
+			expect=$(git cat-file tree $ref | wc -c) ;;
+		blob)
+			expect=$(git cat-file blob $ref | wc -c) ;;
 		commit)
 			expect=$(printf '%s' "$3" | wc -c) ;;
 		esac
@@ -157,6 +159,8 @@ test_atom head subject 'Initial'
 test_atom head subject:sanitize 'Initial'
 test_atom head contents:subject 'Initial'
 test_atom head body ''
+test_atom head contents:raw "$(git cat-file commit refs/heads/main)
+"
 test_atom head contents:body ''
 test_atom head contents:signature ''
 test_atom head contents 'Initial
@@ -686,6 +690,18 @@ test_atom refs/tags/signed-empty contents:body ''
 test_atom refs/tags/signed-empty contents:signature "$sig"
 test_atom refs/tags/signed-empty contents "$sig"
 
+test_expect_success 'basic atom: refs/tags/signed-empty contents:raw' '
+	git cat-file tag refs/tags/signed-empty >expected &&
+	git for-each-ref --format="%(contents:raw)" refs/tags/signed-empty >actual &&
+	sanitize_pgp <expected >expected.clean &&
+	sanitize_pgp <actual >actual.clean &&
+	echo "" >>expected.clean &&
+	test_cmp expected.clean actual.clean
+'
+
+test_atom refs/tags/signed-empty '*contents:raw' "$(git cat-file commit HEAD)
+"
+
 test_atom refs/tags/signed-short subject 'subject line'
 test_atom refs/tags/signed-short subject:sanitize 'subject-line'
 test_atom refs/tags/signed-short contents:subject 'subject line'
@@ -694,6 +710,15 @@ test_atom refs/tags/signed-short contents:body ''
 test_atom refs/tags/signed-short contents:signature "$sig"
 test_atom refs/tags/signed-short contents "subject line
 $sig"
+
+test_expect_success 'basic atom: refs/tags/signed-short contents:raw' '
+	git cat-file tag refs/tags/signed-short >expected &&
+	git for-each-ref --format="%(contents:raw)" refs/tags/signed-short >actual &&
+	sanitize_pgp <expected >expected.clean &&
+	sanitize_pgp <actual >actual.clean &&
+	echo "" >>expected.clean &&
+	test_cmp expected.clean actual.clean
+'
 
 test_atom refs/tags/signed-long subject 'subject line'
 test_atom refs/tags/signed-long subject:sanitize 'subject-line'
@@ -708,6 +733,15 @@ test_atom refs/tags/signed-long contents "subject line
 body contents
 $sig"
 
+test_expect_success 'basic atom: refs/tags/signed-long contents:raw' '
+	git cat-file tag refs/tags/signed-long >expected &&
+	git for-each-ref --format="%(contents:raw)" refs/tags/signed-long >actual &&
+	sanitize_pgp <expected >expected.clean &&
+	sanitize_pgp <actual >actual.clean &&
+	echo "" >>expected.clean &&
+	test_cmp expected.clean actual.clean
+'
+
 test_expect_success 'set up refs pointing to tree and blob' '
 	git update-ref refs/mytrees/first refs/heads/main^{tree} &&
 	git update-ref refs/myblobs/first refs/heads/main:one
@@ -718,14 +752,186 @@ test_atom refs/mytrees/first contents:subject ""
 test_atom refs/mytrees/first body ""
 test_atom refs/mytrees/first contents:body ""
 test_atom refs/mytrees/first contents:signature ""
-test_atom refs/mytrees/first contents ""
+
+test_expect_success 'basic atom: refs/mytrees/first contents' '
+	git cat-file tree refs/mytrees/first >expected &&
+	cat expected | wc -c >size_expected &&
+	echo "" >>expected &&
+	git for-each-ref --format="%(contents)" refs/mytrees/first >actual &&
+	test_cmp expected actual &&
+	git for-each-ref --format="%(contents:size)" refs/mytrees/first >actual &&
+	test_cmp size_expected actual
+'
+
+test_expect_success 'basic atom: refs/mytrees/first contents:raw' '
+	git cat-file tree refs/mytrees/first >expected &&
+	cat expected | wc -c >size_expected &&
+	echo "" >>expected &&
+	git for-each-ref --format="%(contents:raw)" refs/mytrees/first >actual &&
+	test_cmp expected actual
+'
+
+test_expect_success 'basic atom: refs/mytrees/first contents with --python' '
+	cat >expected <<-\EOF &&
+	0000000 030447 030060 032066 020064 067157 000145 157155 153143
+	0000020 106210 070754 101352 115504 123726 045150 042451 077455
+	0000040 030061 033060 032064 072040 067567 072056 173400 167431
+	0000060 030324 025725 144317 065126 131103 062753 104126 104323
+	0000100 023561 000012
+	0000103
+	EOF
+	git for-each-ref --python --format="%(contents)" refs/mytrees/first >actual &&
+	od actual >od_actual &&
+	test_cmp expected od_actual
+'
+
+test_expect_success 'basic atom: refs/mytrees/first contents with --tcl' '
+	cat >expected <<-\EOF &&
+	0000000 030442 030060 032066 020064 067157 000145 157155 153143
+	0000020 106210 070754 101352 115504 123726 045150 042451 077455
+	0000040 030061 033060 032064 072040 067567 072056 173400 167431
+	0000060 030324 025725 144317 065126 131103 062753 104126 104323
+	0000100 021161 000012
+	0000103
+	EOF
+	git for-each-ref --tcl --format="%(contents)" refs/mytrees/first >actual &&
+	od actual >od_actual &&
+	test_cmp expected od_actual
+'
+
+test_expect_success 'basic atom: refs/mytrees/first contents with --shell' '
+	cat >expected <<-\EOF &&
+	0000000 030447 030060 032066 020064 067157 000145 157155 153143
+	0000020 106210 070754 101352 115504 123726 045150 042451 077455
+	0000040 030061 033060 032064 072040 067567 072056 173400 167431
+	0000060 030324 025725 144317 065126 131103 062753 104126 104323
+	0000100 023561 000012
+	0000103
+	EOF
+	git for-each-ref --shell --format="%(contents)" refs/mytrees/first >actual &&
+	od actual >od_actual &&
+	test_cmp expected od_actual
+'
+
+test_expect_success 'basic atom: refs/mytrees/first contents with --perl' '
+	cat >expected <<-\EOF &&
+	0000000 030447 030060 032066 020064 067157 000145 157155 153143
+	0000020 106210 070754 101352 115504 123726 045150 042451 077455
+	0000040 030061 033060 032064 072040 067567 072056 173400 167431
+	0000060 030324 025725 144317 065126 131103 062753 104126 104323
+	0000100 023561 000012
+	0000103
+	EOF
+	git for-each-ref --perl --format="%(contents)" refs/mytrees/first >actual &&
+	od actual >od_actual &&
+	test_cmp expected od_actual
+'
 
 test_atom refs/myblobs/first subject ""
 test_atom refs/myblobs/first contents:subject ""
 test_atom refs/myblobs/first body ""
 test_atom refs/myblobs/first contents:body ""
 test_atom refs/myblobs/first contents:signature ""
-test_atom refs/myblobs/first contents ""
+
+test_expect_success 'basic atom: refs/myblobs/first contents' '
+	git cat-file blob refs/myblobs/first >expected &&
+	cat expected | wc -c >size_expected &&
+	echo "" >>expected &&
+	git for-each-ref --format="%(contents)" refs/myblobs/first >actual &&
+	test_cmp expected actual &&
+	git for-each-ref --format="%(contents:size)" refs/myblobs/first >actual &&
+	test_cmp size_expected actual
+'
+
+test_expect_success 'basic atom: refs/myblobs/first contents:raw' '
+	git cat-file blob refs/myblobs/first >expected &&
+	cat expected | wc -c >size_expected &&
+	echo "" >>expected &&
+	git for-each-ref --format="%(contents:raw)" refs/myblobs/first >actual &&
+	test_cmp expected actual
+'
+
+test_expect_success 'set up refs pointing to binary blob' '
+	printf "%b" "a\0b\0c" >blob1 &&
+	printf "%b" "a\0c\0b" >blob2 &&
+	printf "%b" "\0a\0b\0c" >blob3 &&
+	printf "%b" "abc" >blob4 &&
+	printf "%b" "\0 \0 \0 " >blob5 &&
+	printf "%b" "\0 \0a\0 " >blob6 &&
+	git hash-object blob1 -w | xargs git update-ref refs/myblobs/blob1 &&
+	git hash-object blob2 -w | xargs git update-ref refs/myblobs/blob2 &&
+	git hash-object blob3 -w | xargs git update-ref refs/myblobs/blob3 &&
+	git hash-object blob4 -w | xargs git update-ref refs/myblobs/blob4 &&
+	git hash-object blob5 -w | xargs git update-ref refs/myblobs/blob5 &&
+	git hash-object blob6 -w | xargs git update-ref refs/myblobs/blob6
+'
+
+test_expect_success 'Verify sorts with contents' '
+	cat >expected <<-EOF &&
+	refs/myblobs/blob5
+	refs/myblobs/blob6
+	refs/myblobs/blob3
+	refs/mytrees/first
+	refs/myblobs/first
+	refs/myblobs/blob1
+	refs/myblobs/blob2
+	refs/myblobs/blob4
+	refs/heads/main
+	EOF
+	git for-each-ref --format="%(refname)" --sort=contents \
+		refs/heads/main refs/myblobs/ refs/mytrees/first >actual &&
+	test_cmp expected actual
+'
+
+test_expect_success 'validate contents atom with %(if:equals)' '
+	cat >expect <<-EOF &&
+	not equals
+	not equals
+	not equals
+	not equals
+	not equals
+	not equals
+	refs/myblobs/blob4
+	not equals
+	not equals
+	not equals
+	EOF
+	git for-each-ref --format="%(if:equals=abc)%(contents)%(then)%(refname)%(else)not equals%(end)" \
+		refs/myblobs/ refs/heads/ >actual &&
+	test_cmp expect actual
+'
+test_expect_success 'validate contents atom with %(if:notequals)' '
+	cat >expect <<-EOF &&
+	refs/heads/ambiguous
+	refs/heads/main
+	refs/heads/newtag
+	refs/myblobs/blob1
+	refs/myblobs/blob2
+	refs/myblobs/blob3
+	equals
+	refs/myblobs/blob5
+	refs/myblobs/blob6
+	refs/myblobs/first
+	EOF
+	git for-each-ref --format="%(if:notequals=abc)%(contents)%(then)%(refname)%(else)equals%(end)" \
+		refs/myblobs/ refs/heads/ >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success 'empty contents refs with %(if)' '
+	cat >expect <<-EOF &&
+	refs/myblobs/blob1 not empty
+	refs/myblobs/blob2 not empty
+	refs/myblobs/blob3 not empty
+	refs/myblobs/blob4 not empty
+	refs/myblobs/blob5 empty
+	refs/myblobs/blob6 not empty
+	refs/myblobs/first not empty
+	EOF
+	git for-each-ref --format="%(refname) %(if)%(contents)%(then)not empty%(else)empty%(end)" \
+	refs/myblobs/ >actual &&
+	test_cmp expect actual
+'
 
 test_expect_success 'set up multiple-sort tags' '
 	for when in 100000 200000
